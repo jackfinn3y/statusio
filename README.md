@@ -1,6 +1,8 @@
 <p align="center">
   <img src="assets/Statusio.png" width="180" alt="Statusio Title">
-</p> # Statusio — Debrid Account Status
+</p> 
+---
+# Statusio — Debrid Account Status
 ### *A **Self-Hosted** Stremio Add-on*
 *Developed by **A1337User***  
 
