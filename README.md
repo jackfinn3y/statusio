@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="assets/logo.png" width="180" alt="Statusio logo">
+  <img src="assets/Statusio.png" width="180" alt="Statusio Title">
 </p> # Statusio — Debrid Account Status
 ### *A **Self-Hosted** Stremio Add-on*
 *Developed by **A1337User***  
@@ -40,7 +40,7 @@ It runs locally—**no remote server required**.
 
 ### Screenshot
 
-![Statusio](./Statusio.png)
+![Statusio](/assets/StatusioUI.png)
 
 *(Example layout shown; provider list & text update dynamically.)*
 
