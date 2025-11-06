@@ -32,8 +32,11 @@ const MIN = 60 * 1000;
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 // Solid divider line for stream card formatting
-const LINE =
-  "────────────────";
+const LINE = "────────────────";
+
+// Base URL for external link (hosted Statusio UI)
+const STATUS_BASE_URL =
+  process.env.STATUS_BASE_URL || "https://statusio.elfhosted.com";
 
 const ceilDays = (ms) => Math.max(0, Math.ceil(ms / DAY_MS));
 const addMsToISO = (ms) => new Date(Date.now() + ms).toISOString();
@@ -74,15 +77,16 @@ const getCache = (key) => {
 // ----------------------------- QUOTES --------------------------------------
 
 // 14+ days (OK) — Work mode, smart/funny, short zingers
+// max ~28 characters-ish
 const QUOTES_OK = [
-  // Work-while-watching (5)
+  // Work-while-watching
   "Grind & binge",
   "Work n' watch",
   "Emails? Nah, episodes",
   "Multitask: cry + work",
-  "Boss on mute, show on blast",
+  "Boss muted, show blasted",
 
-  // Short zingers (10 micro, <34 chars)
+  // Short zingers
   "Plot twist: me",
   "Popcorn is needed",
   "Sequel my life",
@@ -94,22 +98,21 @@ const QUOTES_OK = [
   "Dramatic sip",
   "Boom. Plot.",
 
-  // Smart/funny (15+ punchy bangers)
+  // Smart/funny
   "You earned ‘Next Ep’.",
   "Inbox zero, season one.",
   "Adulting with captions.",
-  "Meetings end, movies start.",
-  "Procrastination: cinematic.",
+  "Procrastinatw: cinematic",
   "Budget: snacks approved.",
   "Tonight’s plan: stay.",
   "Your couch filed PTO.",
-  "Microwave time = trailer time.",
+  "Microwave = trailer time",
   "Main quest: relax.",
   "Side quest: popcorn.",
-  "Therapy, but with dragons.",
+  "Therapy but with dragons",
   "Stretch, sip, stream.",
   "Zoom out, zone in.",
-  "One more can't hurt... right?",
+  "One more can't hurt, right?",
   "Doomscrolling, but make it TV",
   "I wanna know what happens next!",
   "Just one season. *Lies.*",
@@ -134,7 +137,7 @@ const QUOTES_OK = [
   "Ctrl+Z real life, pls"
 ];
 
-// 14 days or less (warning) — funny/edgy nudge
+// 14 days or less (warning)
 const QUOTES_WARN = [
   "Renew before cliffhanger.",
   "Cheaper than snacks.",
@@ -158,7 +161,7 @@ const QUOTES_WARN = [
   "Don’t let the algorithm win"
 ];
 
-// 3 days or less (critical) — urgent but still funny
+// 3 days or less (critical)
 const QUOTES_CRIT = [
   "Boss fight: renewal.",
   "Renew soon, it's coming!",
@@ -182,7 +185,7 @@ const QUOTES_CRIT = [
   "Plot armor expiring"
 ];
 
-// 0 or less (expired) — roast mode ON
+// 0 or less (expired)
 const QUOTES_EXPIRED = [
   "Renew ASAP or else...",
   "Your ISP will be mad!",
@@ -653,21 +656,59 @@ function renderProviderCard(r) {
   return { title, description: lines };
 }
 
+// --------------------------- External URL Builder ---------------------------
+// Build a fully encoded external URL pointing at hosted Statusio UI.
+// Example: https://statusio.elfhosted.com/status?provider=Real-Debrid&user=foo&days=10&premium=1
+function buildExternalUrl(result) {
+  try {
+    const base = new URL(STATUS_BASE_URL);
+    // adjust this path if your frontend expects something else
+    base.pathname = "/status";
+
+    if (result?.name) base.searchParams.set("provider", result.name);
+    if (result?.username)
+      base.searchParams.set("user", String(result.username));
+
+    if (Number.isFinite(result?.daysLeft))
+      base.searchParams.set("days", String(result.daysLeft));
+
+    if (typeof result?.premium === "boolean")
+      base.searchParams.set("premium", result.premium ? "1" : "0");
+
+    if (result?.untilISO) base.searchParams.set("until", result.untilISO);
+
+    return base.toString(); // encoded safely
+  } catch (e) {
+    console.warn("[Statusio] Failed to build externalUrl:", e.message);
+    return "about:blank";
+  }
+}
+
 // --------------------------- Manifest & Config ------------------------------
-// Sync version with your package.json (e.g. 1.1.2)
+// Sync version with your package.json
 const manifest = {
   id: "a1337user.statusio.multi.simple",
-  version: "1.1.2",
+  version: "1.1.4",
   name: "Statusio",
   description:
     "Shows premium status & days remaining across multiple debrid providers.",
-  resources: ["stream"],
+  // Use advanced resource form, explicitly tied to Cinemeta's tt IDs
+  resources: [
+    {
+      name: "stream",
+      types: ["movie", "series", "channel", "tv"],
+      idPrefixes: ["tt"]
+    }
+  ],
+  // Global fallback content types & idPrefixes (matches docs pattern)
   types: ["movie", "series", "channel", "tv"],
+  idPrefixes: ["tt"],
+
   catalogs: [],
   behaviorHints: { configurable: true, configurationRequired: false },
   logo: LOGO_DATA_URL || undefined,
 
-  // IMPORTANT: use "key", not "name", per Stremio manifest docs
+  // Configurable fields (per docs: "key", not "name")
   config: [
     {
       key: "cache_minutes",
@@ -707,6 +748,12 @@ const builder = new addonBuilder(manifest);
 
 // ---------------------------- Stream Handler -------------------------------
 builder.defineStreamHandler(async (args) => {
+  // Helpful logging to see if Android TV actually hits us
+  console.log(
+    "[Statusio] stream request:",
+    JSON.stringify({ type: args?.type, id: args?.id }, null, 2)
+  );
+
   // raw config from Stremio – may be an object OR a JSON string
   const rawCfg = args?.config ?? {};
   let cfg = {};
@@ -819,7 +866,7 @@ builder.defineStreamHandler(async (args) => {
       name: "🔐 Statusio",
       title: card.title,
       description: card.description,
-      externalUrl: "about:blank"
+      externalUrl: buildExternalUrl(r)
     });
   }
 
