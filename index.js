@@ -711,10 +711,10 @@ function buildExternalUrl(result, tokens) {
 }
 
 // --------------------------- Manifest & Config ------------------------------
-// v1.1.6 — tighten manifest for Android TV: stream only, movie/series, "tt" ids
+// v1.1.7 — tighten manifest for Android TV: stream only, movie/series, "tt" ids
 const manifest = {
   id: "a1337user.statusio.multi.simple",
-  version: "1.1.6",
+  version: "1.1.7",
   name: "Statusio",
   description:
     "Shows premium status & days remaining across multiple debrid providers.",
