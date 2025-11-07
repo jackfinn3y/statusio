@@ -34,9 +34,28 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 // Solid divider line for stream card formatting
 const LINE = "────────────────";
 
-// Base URL for external link fallback (hosted Statusio UI)
-const STATUS_BASE_URL =
-  process.env.STATUS_BASE_URL || "https://statusio.elfhosted.com";
+// Fallback URL if no provider is selected
+const STATUS_FALLBACK_URL =
+  process.env.STATUS_BASE_URL || "https://statusio.elfhosted.com/";
+
+// Provider homepages for smart routing
+const PROVIDER_SITES = {
+  rd: "https://real-debrid.com/",
+  tb: "https://torbox.app/",
+  pm: "https://www.premiumize.me/",
+  ad: "https://alldebrid.com/",
+  dl: "https://debrid-link.com/"
+};
+
+// Pick main external URL based on token presence & priority:
+// RD → TorBox → Premiumize → AllDebrid → Debrid-Link → fallback
+function choosePrimaryExternalUrl(tokens) {
+  const order = ["rd", "tb", "pm", "ad", "dl"];
+  for (const key of order) {
+    if (tokens[key]) return PROVIDER_SITES[key];
+  }
+  return STATUS_FALLBACK_URL;
+}
 
 const ceilDays = (ms) => Math.max(0, Math.ceil(ms / DAY_MS));
 const addMsToISO = (ms) => new Date(Date.now() + ms).toISOString();
@@ -656,91 +675,15 @@ function renderProviderCard(r) {
   return { title, description: lines };
 }
 
-// --------------------------- External URL Builder ---------------------------
-
-// Direct site URLs per provider
-const PROVIDER_URLS = {
-  "Real-Debrid": "https://real-debrid.com/",
-  "TorBox": "https://torbox.app/",
-  Premiumize: "https://www.premiumize.me/",
-  AllDebrid: "https://alldebrid.com/",
-  "Debrid-Link": "https://debrid-link.com/"
-};
-
-// Priority for picking a single provider when multiple are enabled
-// (Real-Debrid → TorBox → Premiumize → AllDebrid → Debrid-Link)
-const PRIORITY_ORDER = [
-  "realdebrid",
-  "torbox",
-  "premiumize",
-  "alldebrid",
-  "debridlink"
-];
-
-// Build external URL based on provider result + enabled set
-function buildExternalUrl(result, enabled) {
-  try {
-    const name = result?.name || "";
-    const lower = name.toLowerCase();
-
-    // 1) Direct match by provider name on the card
-    if (lower.includes("real-debrid")) return PROVIDER_URLS["Real-Debrid"];
-    if (lower.includes("torbox")) return PROVIDER_URLS["TorBox"];
-    if (lower.includes("premiumize")) return PROVIDER_URLS["Premiumize"];
-    if (lower.includes("alldebrid") || lower.includes("all-debrid"))
-      return PROVIDER_URLS["AllDebrid"];
-    if (lower.includes("debrid-link") || lower.includes("debrid link"))
-      return PROVIDER_URLS["Debrid-Link"];
-
-    // 2) Fallback: pick first enabled provider by priority
-    for (const key of PRIORITY_ORDER) {
-      if (enabled?.[key]) {
-        switch (key) {
-          case "realdebrid":
-            return PROVIDER_URLS["Real-Debrid"];
-          case "torbox":
-            return PROVIDER_URLS["TorBox"];
-          case "premiumize":
-            return PROVIDER_URLS["Premiumize"];
-          case "alldebrid":
-            return PROVIDER_URLS["AllDebrid"];
-          case "debridlink":
-            return PROVIDER_URLS["Debrid-Link"];
-        }
-      }
-    }
-
-    // 3) Last resort: fall back to hosted UI if set, otherwise about:blank
-    if (STATUS_BASE_URL) {
-      const base = new URL(STATUS_BASE_URL);
-      base.pathname = "/status";
-      if (result?.name) base.searchParams.set("provider", result.name);
-      if (result?.username)
-        base.searchParams.set("user", String(result.username));
-      if (Number.isFinite(result?.daysLeft))
-        base.searchParams.set("days", String(result.daysLeft));
-      if (typeof result?.premium === "boolean")
-        base.searchParams.set("premium", result.premium ? "1" : "0");
-      if (result?.untilISO) base.searchParams.set("until", result.untilISO);
-      return base.toString();
-    }
-
-    return "about:blank";
-  } catch (e) {
-    console.warn("[Statusio] Failed to build externalUrl:", e.message);
-    return "about:blank";
-  }
-}
-
 // --------------------------- Manifest & Config ------------------------------
 // Sync version with your package.json
 const manifest = {
   id: "a1337user.statusio.multi.simple",
-  version: "1.1.5",
+  version: "1.1.6",
   name: "Statusio",
   description:
     "Shows premium status & days remaining across multiple debrid providers.",
-  // Use advanced resource form, explicitly tied to Cinemeta's tt IDs
+  // Advanced resource form tied to Cinemeta tt IDs
   resources: [
     {
       name: "stream",
@@ -748,7 +691,7 @@ const manifest = {
       idPrefixes: ["tt"]
     }
   ],
-  // Global fallback content types & idPrefixes
+  // Global fallback types / idPrefixes
   types: ["movie", "series", "channel", "tv"],
   idPrefixes: ["tt"],
 
@@ -796,15 +739,18 @@ const builder = new addonBuilder(manifest);
 
 // ---------------------------- Stream Handler -------------------------------
 builder.defineStreamHandler(async (args) => {
-  // Helpful logging to see if Android TV actually hits us
+  // Log request context so we can see if Android TV is calling us
   const type = args?.type || "";
   const id = String(args?.id || "");
-  console.log("[Statusio] stream request:", JSON.stringify({ type, id }, null, 2));
+  console.log(
+    "[Statusio] stream request:",
+    JSON.stringify({ type, id }, null, 2)
+  );
 
-  // Explicitly only handle Cinemeta-style IMDb IDs on all clients
+  // Strictly handle only Cinemeta-like IDs (tt...)
   if (!id || !id.startsWith("tt")) {
-    console.log("[Statusio] unsupported id, returning no streams:", id);
-    return { streams: [], cacheMaxAge: 60 };
+    console.log("[Statusio] Skipping non-tt id:", id);
+    return { streams: [] };
   }
 
   // raw config from Stremio – may be an object OR a JSON string
@@ -829,7 +775,7 @@ builder.defineStreamHandler(async (args) => {
     ? Math.max(1, Number(cfg.cache_minutes))
     : 45;
 
-  // Prefer config values; env vars only as fallback for dev
+  // Prefer config values; env vars only as fallback
   const tokens = {
     rd: String(cfg.rd_token || process.env.RD_TOKEN || "").trim(),
     ad: String(cfg.ad_key || process.env.AD_KEY || "").trim(),
@@ -904,8 +850,10 @@ builder.defineStreamHandler(async (args) => {
             name: "🔐 Statusio",
             title: "⚠️ Status unavailable",
             description: lines,
-            externalUrl: "about:blank",
-            behaviorHints: { notWebReady: true }
+            externalUrl: STATUS_FALLBACK_URL,
+            behaviorHints: {
+              notWebReady: true
+            }
           }
         ],
         cacheMaxAge: 60
@@ -913,16 +861,17 @@ builder.defineStreamHandler(async (args) => {
     }
   }
 
+  const primaryExternalUrl = choosePrimaryExternalUrl(tokens);
   const streams = [];
+
   for (const r of results) {
     const card = renderProviderCard(r);
     streams.push({
       name: "🔐 Statusio",
       title: card.title,
       description: card.description,
-      externalUrl: buildExternalUrl(r, enabled),
+      externalUrl: primaryExternalUrl,
       behaviorHints: {
-        // Important for Android TV: this is *not* a direct video stream
         notWebReady: true
       }
     });
@@ -945,8 +894,10 @@ builder.defineStreamHandler(async (args) => {
           "• Debrid-Link (dl_key)",
           LINE
         ].join("\n"),
-        externalUrl: "about:blank",
-        behaviorHints: { notWebReady: true }
+        externalUrl: STATUS_FALLBACK_URL,
+        behaviorHints: {
+          notWebReady: true
+        }
       });
     } else {
       streams.push({
@@ -965,8 +916,10 @@ builder.defineStreamHandler(async (args) => {
           "Check that your tokens are valid and saved in Configure.",
           LINE
         ].join("\n"),
-        externalUrl: "about:blank",
-        behaviorHints: { notWebReady: true }
+        externalUrl: STATUS_FALLBACK_URL,
+        behaviorHints: {
+          notWebReady: true
+        }
       });
     }
   }
@@ -982,5 +935,4 @@ builder.defineStreamHandler(async (args) => {
 // ------------------------------ Server -------------------------------------
 const PORT = Number(process.env.PORT || 7042);
 serveHTTP(builder.getInterface(), { port: PORT, hostname: "0.0.0.0" });
-
 console.log(`Statusio at http://127.0.0.1:${PORT}/manifest.json`);
