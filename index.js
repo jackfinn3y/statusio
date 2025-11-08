@@ -41,9 +41,9 @@ const STATUS_BASE_URL =
 // Provider website homepages (for smart routing)
 const PROVIDER_URL = {
   "Real-Debrid": "https://real-debrid.com/",
-  TorBox: "https://torbox.app/",
-  Premiumize: "https://www.premiumize.me/",
-  AllDebrid: "https://alldebrid.com/",
+  "TorBox": "https://torbox.app/",
+  "Premiumize": "https://www.premiumize.me/",
+  "AllDebrid": "https://alldebrid.com/",
   "Debrid-Link": "https://debrid-link.com/"
 };
 
@@ -95,7 +95,6 @@ const getCache = (key) => {
 // ----------------------------- QUOTES --------------------------------------
 
 // 14+ days (OK) — Work mode, smart/funny, short zingers
-// max ~28 characters-ish
 const QUOTES_OK = [
   "Grind & binge",
   "Work n' watch",
@@ -625,7 +624,7 @@ async function pDebridLink({
   }
 }
 
-// --------------------------- Rendering -------------------------------------
+// --------------------------- Status + Rendering -----------------------------
 function statusInfo(days) {
   if (days <= 0) return { mark: "🔴 Status: Expired", bucket: QUOTES_EXPIRED };
   if (days <= 3) return { mark: "🟠 Status: Critical", bucket: QUOTES_CRIT };
@@ -633,7 +632,8 @@ function statusInfo(days) {
   return { mark: "🟢 Status: OK", bucket: QUOTES_OK };
 }
 
-function renderProviderCard(r) {
+// platform ∈ "android-tv" | "tizen" | "desktop" | "mobile" | "unknown"
+function renderProviderCard(r, { platform = "unknown" } = {}) {
   const service = r.name;
   const user = r?.username ? `@${String(r.username)}` : "—";
   const days =
@@ -654,19 +654,34 @@ function renderProviderCard(r) {
   else if (mark.startsWith("🔴")) titlePrefix = "🔴 Expired";
 
   const title = `${titlePrefix} — ${service}`;
+  const isTv = platform === "android-tv" || platform === "tizen";
 
-  const lines = [
-    LINE,
-    `🤝 Service: ${service}`,
-    `👤 ${user}`,
-    `⭐ Premium until: ${dateStr}`,
-    `⏳ Days remaining: ${days} D`,
-    `${mark}`,
-    `💬 ${quote}`,
-    LINE
-  ].join("\n");
+  let description;
 
-  return { title, description: lines };
+  if (isTv) {
+    // Super compact for TV clients (Android TV / Tizen)
+    // Aim: 1–3 short lines, ~200 chars max
+    const core =
+      `Service: ${service}\n` +
+      `User: ${user}\n` +
+      `Until: ${dateStr} • ${numericDays}D\n` +
+      `${mark} • ${quote}`;
+    description = core.slice(0, 220); // hard cap
+  } else {
+    // Full rich card for desktop / mobile
+    description = [
+      LINE,
+      `🤝 Service: ${service}`,
+      `👤 ${user}`,
+      `⭐ Premium until: ${dateStr}`,
+      `⏳ Days remaining: ${days} D`,
+      `${mark}`,
+      `💬 ${quote}`,
+      LINE
+    ].join("\n");
+  }
+
+  return { title, description };
 }
 
 // --------------------------- External URL Builder ---------------------------
@@ -710,11 +725,44 @@ function buildExternalUrl(result, tokens) {
   }
 }
 
+// --------------------------- Platform Detection -----------------------------
+function detectPlatform(args = {}, req = null) {
+  // Prefer explicit header sent by some Stremio clients
+  const extra = args.extra || {};
+  const extraHeaders = extra.headers || {};
+
+  const headers = (req && req.headers) || extraHeaders || {};
+  const stremioPlatform = headers["stremio-platform"];
+
+  if (stremioPlatform && typeof stremioPlatform === "string") {
+    return stremioPlatform.toLowerCase();
+  }
+
+  const uaRaw =
+    headers["stremio-user-agent"] ||
+    headers["user-agent"] ||
+    extra.userAgent ||
+    "";
+  const ua = String(uaRaw).toLowerCase();
+
+  if (!ua) return "unknown";
+
+  if (ua.includes("tizen")) return "tizen";
+  if (ua.includes("android tv") || ua.includes("androidtv") || ua.includes("bravia"))
+    return "android-tv";
+  if (ua.includes("mobile") || ua.includes("phone") || ua.includes("android"))
+    return "mobile";
+  if (ua.includes("windows") || ua.includes("macintosh") || ua.includes("linux"))
+    return "desktop";
+
+  return "unknown";
+}
+
 // --------------------------- Manifest & Config ------------------------------
-// v1.1.8 — remove stream.type="other" for stricter platforms, keep movie/series only
+// v1.1.9 — platform-aware descriptions; compact on Android TV / Tizen
 const manifest = {
   id: "a1337user.statusio.multi.simple",
-  version: "1.1.8",
+  version: "1.1.9",
   name: "Statusio",
   description:
     "Shows premium status & days remaining across multiple debrid providers.",
@@ -766,11 +814,18 @@ const manifest = {
 const builder = new addonBuilder(manifest);
 
 // ---------------------------- Stream Handler -------------------------------
-builder.defineStreamHandler(async (args) => {
-  // Quick filter: we only target Cinemeta items with tt IDs
+builder.defineStreamHandler(async (args, req) => {
   const reqType = String(args?.type || "");
   const reqId = String(args?.id || "");
-  console.log("[Statusio] stream request:", { type: reqType, id: reqId });
+  const platform = detectPlatform(args, req);
+
+  console.log("[Statusio] stream request:", {
+    type: reqType,
+    id: reqId,
+    platform
+  });
+
+  // Only Cinemeta items with tt IDs
   if (!reqId || !reqId.startsWith("tt")) {
     return { streams: [] };
   }
@@ -815,6 +870,7 @@ builder.defineStreamHandler(async (args) => {
   console.log("[Statusio enabled]", enabled);
 
   const cacheKey = [
+    platform,
     Object.entries(enabled)
       .filter(([, v]) => v)
       .map(([k]) => k)
@@ -881,12 +937,12 @@ builder.defineStreamHandler(async (args) => {
 
   const streams = [];
   for (const r of results) {
-    const card = renderProviderCard(r);
+    const card = renderProviderCard(r, { platform });
     streams.push({
       name: "🔐 Statusio",
       title: card.title,
       description: card.description,
-      behaviorHints: { notWebReady: true }, // info-only card
+      behaviorHints: { notWebReady: true }, // info-only card hint
       externalUrl: buildExternalUrl(r, tokens)
     });
   }
