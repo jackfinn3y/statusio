@@ -624,7 +624,7 @@ async function pDebridLink({
   }
 }
 
-// --------------------------- Status + Rendering -----------------------------
+// --------------------------- Rendering -------------------------------------
 function statusInfo(days) {
   if (days <= 0) return { mark: "🔴 Status: Expired", bucket: QUOTES_EXPIRED };
   if (days <= 3) return { mark: "🟠 Status: Critical", bucket: QUOTES_CRIT };
@@ -632,8 +632,7 @@ function statusInfo(days) {
   return { mark: "🟢 Status: OK", bucket: QUOTES_OK };
 }
 
-// platform ∈ "android-tv" | "tizen" | "desktop" | "mobile" | "unknown"
-function renderProviderCard(r, { platform = "unknown" } = {}) {
+function renderProviderCard(r) {
   const service = r.name;
   const user = r?.username ? `@${String(r.username)}` : "—";
   const days =
@@ -654,34 +653,19 @@ function renderProviderCard(r, { platform = "unknown" } = {}) {
   else if (mark.startsWith("🔴")) titlePrefix = "🔴 Expired";
 
   const title = `${titlePrefix} — ${service}`;
-  const isTv = platform === "android-tv" || platform === "tizen";
 
-  let description;
+  const lines = [
+    LINE,
+    `🤝 Service: ${service}`,
+    `👤 ${user}`,
+    `⭐ Premium until: ${dateStr}`,
+    `⏳ Days remaining: ${days} D`,
+    `${mark}`,
+    `💬 ${quote}`,
+    LINE
+  ].join("\n");
 
-  if (isTv) {
-    // Super compact for TV clients (Android TV / Tizen)
-    // Aim: 1–3 short lines, ~200 chars max
-    const core =
-      `Service: ${service}\n` +
-      `User: ${user}\n` +
-      `Until: ${dateStr} • ${numericDays}D\n` +
-      `${mark} • ${quote}`;
-    description = core.slice(0, 220); // hard cap
-  } else {
-    // Full rich card for desktop / mobile
-    description = [
-      LINE,
-      `🤝 Service: ${service}`,
-      `👤 ${user}`,
-      `⭐ Premium until: ${dateStr}`,
-      `⏳ Days remaining: ${days} D`,
-      `${mark}`,
-      `💬 ${quote}`,
-      LINE
-    ].join("\n");
-  }
-
-  return { title, description };
+  return { title, description: lines };
 }
 
 // --------------------------- External URL Builder ---------------------------
@@ -725,49 +709,20 @@ function buildExternalUrl(result, tokens) {
   }
 }
 
-// --------------------------- Platform Detection -----------------------------
-function detectPlatform(args = {}, req = null) {
-  // Prefer explicit header sent by some Stremio clients
-  const extra = args.extra || {};
-  const extraHeaders = extra.headers || {};
-
-  const headers = (req && req.headers) || extraHeaders || {};
-  const stremioPlatform = headers["stremio-platform"];
-
-  if (stremioPlatform && typeof stremioPlatform === "string") {
-    return stremioPlatform.toLowerCase();
-  }
-
-  const uaRaw =
-    headers["stremio-user-agent"] ||
-    headers["user-agent"] ||
-    extra.userAgent ||
-    "";
-  const ua = String(uaRaw).toLowerCase();
-
-  if (!ua) return "unknown";
-
-  if (ua.includes("tizen")) return "tizen";
-  if (ua.includes("android tv") || ua.includes("androidtv") || ua.includes("bravia"))
-    return "android-tv";
-  if (ua.includes("mobile") || ua.includes("phone") || ua.includes("android"))
-    return "mobile";
-  if (ua.includes("windows") || ua.includes("macintosh") || ua.includes("linux"))
-    return "desktop";
-
-  return "unknown";
-}
-
 // --------------------------- Manifest & Config ------------------------------
-// v1.1.9 — platform-aware descriptions; compact on Android TV / Tizen
+// v1.1.10 — no stream.type (for stricter clients), url+externalUrl
 const manifest = {
   id: "a1337user.statusio.multi.simple",
-  version: "1.1.9",
+  version: "1.1.10",
   name: "Statusio",
   description:
     "Shows premium status & days remaining across multiple debrid providers.",
   resources: [
-    { name: "stream", types: ["movie", "series"], idPrefixes: ["tt"] }
+    {
+      name: "stream",
+      types: ["movie", "series"],
+      idPrefixes: ["tt"]
+    }
   ],
   types: ["movie", "series"],
   idPrefixes: ["tt"],
@@ -814,18 +769,11 @@ const manifest = {
 const builder = new addonBuilder(manifest);
 
 // ---------------------------- Stream Handler -------------------------------
-builder.defineStreamHandler(async (args, req) => {
+builder.defineStreamHandler(async (args) => {
+  // Quick filter: we only target Cinemeta items with tt IDs
   const reqType = String(args?.type || "");
   const reqId = String(args?.id || "");
-  const platform = detectPlatform(args, req);
-
-  console.log("[Statusio] stream request:", {
-    type: reqType,
-    id: reqId,
-    platform
-  });
-
-  // Only Cinemeta items with tt IDs
+  console.log("[Statusio] stream request:", { type: reqType, id: reqId });
   if (!reqId || !reqId.startsWith("tt")) {
     return { streams: [] };
   }
@@ -870,7 +818,6 @@ builder.defineStreamHandler(async (args, req) => {
   console.log("[Statusio enabled]", enabled);
 
   const cacheKey = [
-    platform,
     Object.entries(enabled)
       .filter(([, v]) => v)
       .map(([k]) => k)
@@ -920,14 +867,21 @@ builder.defineStreamHandler(async (args, req) => {
         String(e.message || e),
         LINE
       ].join("\n");
+
+      const fallbackLink = STATUS_BASE_URL;
+
       return {
         streams: [
           {
             name: "🔐 Statusio",
             title: "⚠️ Status unavailable",
             description: lines,
-            behaviorHints: { notWebReady: true },
-            externalUrl: "about:blank"
+            url: fallbackLink,
+            externalUrl: fallbackLink,
+            behaviorHints: {
+              notWebReady: true,
+              bingeGroup: "statusio-info"
+            }
           }
         ],
         cacheMaxAge: 60
@@ -937,18 +891,25 @@ builder.defineStreamHandler(async (args, req) => {
 
   const streams = [];
   for (const r of results) {
-    const card = renderProviderCard(r, { platform });
+    const card = renderProviderCard(r);
+    const link = buildExternalUrl(r, tokens);
+
     streams.push({
       name: "🔐 Statusio",
       title: card.title,
       description: card.description,
-      behaviorHints: { notWebReady: true }, // info-only card hint
-      externalUrl: buildExternalUrl(r, tokens)
+      url: link,
+      externalUrl: link,
+      behaviorHints: {
+        notWebReady: true,
+        bingeGroup: "statusio-info"
+      }
     });
   }
 
   if (streams.length === 0) {
     const hasAnyCfg = Object.keys(cfg).length > 0;
+    const fallbackLink = STATUS_BASE_URL;
 
     if (!hasAnyCfg) {
       streams.push({
@@ -964,8 +925,12 @@ builder.defineStreamHandler(async (args, req) => {
           "• Debrid-Link (dl_key)",
           LINE
         ].join("\n"),
-        behaviorHints: { notWebReady: true },
-        externalUrl: "about:blank"
+        url: fallbackLink,
+        externalUrl: fallbackLink,
+        behaviorHints: {
+          notWebReady: true,
+          bingeGroup: "statusio-info"
+        }
       });
     } else {
       streams.push({
@@ -984,8 +949,12 @@ builder.defineStreamHandler(async (args, req) => {
           "Check that your tokens are valid and saved in Configure.",
           LINE
         ].join("\n"),
-        behaviorHints: { notWebReady: true },
-        externalUrl: "about:blank"
+        url: fallbackLink,
+        externalUrl: fallbackLink,
+        behaviorHints: {
+          notWebReady: true,
+          bingeGroup: "statusio-info"
+        }
       });
     }
   }
