@@ -33,7 +33,7 @@ A tiny, Stremio add-on that shows your **premium status & days remaining** for *
 ---
 
 ## Overview
-This add-on renders a single **info card** in the **Streams** tab for movies/series/channel/tv indicating your debrid account status:
+This add-on renders a single **info card** in the **Streams** tab if less than ≤ 30 days remanining for movies/series/channel/tv indicating your debrid account status:
 
 - 🟢 **OK** — active premium until *YYYY-MM-DD*
 - 🟡 **Warning** — **≤ 14 days** remaining
@@ -68,7 +68,7 @@ It runs locally—**no remote server required**.
 - **ENV fallback** for quick testing (`RD_TOKEN`, `AD_KEY`, `PM_KEY`, `TB_TOKEN`, `DL_KEY`)
 - **Demo Mode** (*all_active* / *some_off*) to preview without tokens
 - **Small in-memory cache** to avoid API spam
-- **Compact 6–8 line display** with friendly quotes and renewal nudges
+- **Compact 6–8 line display** with configureab;e friendly quotes and renewal nudges
 
 
 ## Self-hosting 
