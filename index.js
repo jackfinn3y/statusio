@@ -6,18 +6,18 @@
 //     ▀█   █    ▄▀▀▀█    █    █   █   ▀▀▀▄    █    █   █ 
 // ▀▄▄▄█▀   ▀▄▄  ▀▄▄▀█    ▀▄▄  ▀▄▄▀█  ▀▄▄▄▀  ▄▄█▄▄  ▀█▄█▀ 
 //
-//                         v1.1.27                                                                                     
+//                         v1.1.28                                                                                     
 // ============================================================================
 
 // ============================================================================
 //
 // Changes:
-//
+// 
 // - New config: "Would you like to use quotes?" (show_quotes: yes/no)
-// - Only show Statusio streams if subscription has <= 30 days remaining
-// - Negative days (expired) are clamped to 0 and shown as "Expired"
-// - Description = ONLY per-field lines (no footer/thank-you/etc.)
-//
+// - New config: "When should Statusio appear?" (visibility_mode: threshold / always)
+// - Only show Statusio streams by default if subscription has <= 30 days remaining
+// - description = ONLY the per-field lines (no footer/thank-you/etc.)
+// 
 // ============================================================================
 
 import sdk from "stremio-addon-sdk";
@@ -661,7 +661,7 @@ function formatProviderStatusWithBreaks(r, showQuote = true) {
 // --------------------------- Manifest (TV-Compatible) ----------------------
 const manifest = {
   id: "a1337user.statusio.tv.compatible",
-  version: "1.1.27",
+  version: "1.1.28",
   name: "Statusio",
   description:
     "Shows premium status & days remaining across multiple debrid providers.",
@@ -684,6 +684,13 @@ const manifest = {
       title: "Would you like to use quotes?",
       default: "yes",
       options: ["yes", "no"],
+    },
+    {
+      key: "visibility_mode",
+      type: "select",
+      title: "When should Statusio appear?",
+      default: "only when close to expiration (≤30 days or less)",
+      options: ["only when close to expiration (≤30 days or less)", "show for every stream session, everytime"],
     },
     {
       key: "demo_mode",
@@ -856,6 +863,7 @@ async function fetchStatusData(cfg) {
 }
 
 // ---------------------------- Stream Handler (TV) --------------------------
+// ---------------------------- Stream Handler (TV) --------------------------
 builder.defineStreamHandler(async (args) => {
   const reqId = String(args?.id || "");
   if (!reqId || !reqId.startsWith("tt")) return { streams: [] };
@@ -874,14 +882,10 @@ builder.defineStreamHandler(async (args) => {
 
   const statusData = await fetchStatusData(cfg);
 
-  const demoRaw = (cfg.demo_mode || "").toString().toLowerCase();
-  const demoModeOn = demoRaw === "on" || demoRaw === "true" || demoRaw === "1";
-
-  // TVs filter out setup/instructional streams; if no tokens AND not demo, return empty.
+  // TVs filter out setup/instructional streams; if no tokens, return empty.
   if (
-    !demoModeOn &&
-    (!statusData.enabled ||
-      !Object.values(statusData.enabled).some((v) => v))
+    !statusData.enabled ||
+    !Object.values(statusData.enabled).some((v) => v)
   ) {
     return { streams: [] };
   }
@@ -897,8 +901,14 @@ builder.defineStreamHandler(async (args) => {
     if (["yes", "true", "1", "on"].includes(val)) showQuotes = true;
   }
 
-  const streams = [];
+  // Determine visibility mode
+  const visRaw = (cfg.visibility_mode || "only when close to expiration (≤30 days or less)")
+    .toString()
+    .toLowerCase();
+  const alwaysMode = ["show for every stream session, everytime", "always"].includes(visRaw);
   const THRESHOLD_DAYS = 30;
+
+  const streams = [];
 
   if (statusData.hasData) {
     for (const r of statusData.results) {
@@ -913,8 +923,10 @@ builder.defineStreamHandler(async (args) => {
       // If days are unknown, treat as non-urgent and skip
       if (numericDays === null) continue;
 
-      // Only show card if <= 30 days remaining
-      if (numericDays <= THRESHOLD_DAYS) {
+      const shouldShow =
+        alwaysMode || numericDays <= THRESHOLD_DAYS;
+
+      if (shouldShow) {
         streams.push({
           name: "🔐 Statusio",
           description: formatProviderStatusWithBreaks(
@@ -964,7 +976,7 @@ const PORT = Number(process.env.PORT || 7042);
 serveHTTP(builder.getInterface(), { port: PORT, hostname: "0.0.0.0" });
 
 console.log(
-  `✅ Statusio v1.1.27 at http://127.0.0.1:${PORT}/manifest.json`
+  `✅ Statusio v1.1.28 at http://127.0.0.1:${PORT}/manifest.json`
 );
 console.log(
   `↩️  Description = strict per-field lines; quotes optional; only ≤30 days show; demo mode available.`
