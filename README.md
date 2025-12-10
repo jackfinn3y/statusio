@@ -5,7 +5,7 @@
 ---
 
 # Statusio — Debrid Account Status
-### *A **Debrid-Based** Stremio Add-on*
+### *A **Debrid-Based** Stremio Add-on* 
 *Developed by **A1337User***  
 
 A tiny, Stremio add-on that shows your **premium status & days remaining** for *multiple debrid providers* as a single **info card** in the **Streams** tab.
