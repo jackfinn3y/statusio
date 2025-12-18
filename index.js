@@ -15,7 +15,7 @@
 // 
 // - New config: "Would you like to use quotes?" (show_quotes: yes/no)
 // - New config: "When should Statusio appear?" (visibility_mode: threshold / always)
-// - Only show Statusio streams by default if subscription has <= 30 days remaining
+// - Only show Statusio streams by default if subscription has <= 3 days remaining
 // - description = ONLY the per-field lines (no footer/thank-you/etc.)
 // 
 // ============================================================================
@@ -689,8 +689,8 @@ const manifest = {
       key: "visibility_mode",
       type: "select",
       title: "When should Statusio appear?",
-      default: "only when close to expiration (≤30 days or less)",
-      options: ["only when close to expiration (≤30 days or less)", "show for every stream session, everytime"],
+      default: "only when close to expiration (≤3 days or less)",
+      options: ["only when close to expiration (≤3 days or less)", "show for every stream session, everytime"],
     },
     {
       key: "demo_mode",
@@ -902,11 +902,11 @@ builder.defineStreamHandler(async (args) => {
   }
 
   // Determine visibility mode
-  const visRaw = (cfg.visibility_mode || "only when close to expiration (≤30 days or less)")
+  const visRaw = (cfg.visibility_mode || "only when close to expiration (≤3 days or less)")
     .toString()
     .toLowerCase();
   const alwaysMode = ["show for every stream session, everytime", "always"].includes(visRaw);
-  const THRESHOLD_DAYS = 30;
+  const THRESHOLD_DAYS = 3;
 
   const streams = [];
 
@@ -979,5 +979,5 @@ console.log(
   `✅ Statusio v1.1.28 at http://127.0.0.1:${PORT}/manifest.json`
 );
 console.log(
-  `↩️  Description = strict per-field lines; quotes optional; only ≤30 days show; demo mode available.`
+  `↩️  Description = strict per-field lines; quotes optional; only ≤3 days show; demo mode available.`
 );
