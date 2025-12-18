@@ -13,9 +13,8 @@
 //
 // Changes:
 // 
-// - New config: "Would you like to use quotes?" (show_quotes: yes/no)
-// - New config: "When should Statusio appear?" (visibility_mode: threshold / always)
 // - Only show Statusio streams by default if subscription has <= 3 days remaining
+// - Quotes removed completely
 // - description = ONLY the per-field lines (no footer/thank-you/etc.)
 // 
 // ============================================================================
@@ -55,136 +54,6 @@ function daysLeftFromDurationSec(durationSec) {
     untilISO: new Date(Date.now() + ms).toISOString(),
   };
 }
-
-// ----------------------------- Quotes --------------------------------------
-
-// 14+ days (OK) — Work mode, smart/funny, short zingers
-const QUOTES_OK = [
-  // Work-while-watching (5)
-  "Grind & binge time!", "Work n' watch time!", "Emails? Nah, more episodes.",
-  "Multitask: cry + work.", "Boss on mute, show on blast!",
-
-  // Short zingers (10 micro, <34 chars)
-  "Plot twist: me!", "Popcorn is needed!", "Sequel my life...",
-  "Cue the chaos!", "Credits? Nope. Next.", "Spoiler: Need snacks.",
-  "Villain = Bill time.", "*dramatic sip*", "Boom. Plot.",
-
-  // Smart/funny (punchy bangers)
-  "You earned this binge, champ", "Queue = life. Season 1 GO",
-  "Adulting? Nah, captioning", "Meetings done, MOVIE ON",
-  "Procrastination level: PRO", "Budget says: snacks > rent",
-  "Tonight: couch + 47 episodes", "Couch just filed for PTO",
-  "Microwave = trailer timer", "Main quest: DO NOT DISTURB",
-  "Side quest: find the remote", "Therapy? Nah, dragons",
-  "Stretch. Sip. Stream. Repeat.", "Zoom call over, ZONE IN",
-  "One more ep… *famous last words*", "Doomscrolling, but on TV",
-  "I NEED to know what happens!", "Just one ep… *lies to mirror*",
-  "Sleep? What’s that?", "Cliffhanger holding me hostage",
-  "I can stop… after this season", "Self-care = 3AM binge",
-  "Oops, autoplay betrayed me", "Brain: one more. Body: 12 later",
-  "Plot > rent > my GPA", "Credits? We don’t do that here",
-  "I now live in Couchville", "Let credits roll… IN HELL",
-  "Skipping intros = cardio", "Hydrate? I drink DRAMA",
-  "Laundry? Drama waits for NO ONE", "Toilet break = Russian roulette",
-  "Remote > my ex > my mom", "Binge now, regret at sunrise",
-  "Spoilers = war crime", "Ctrl+Z my entire life pls",
-  "My plants died for this binge", "3AM me: still watching",
-  "Eyebags = plot armor", "Blink = miss the plot",
-  "Snaccident in progress", "Chores? What chores?",
-  "Plot holes > life holes", "Remote stuck to my hand",
-  "Next ep = my religion", "Buffering = life coach",
-  "Subtitles = reading cheat", "Season finale? Pain.",
-  "Autoplay = evil genius", "Blanket burrito mode",
-  "My butt’s gone numb", "Snacks > stock market",
-  "Pause? Never heard", "Plot twist: I’m broke",
-  "Streaming > streaming IRL", "Eye strain = trophy",
-  "Rewind = time travel", "Volume 47 = normal",
-  "Binge coma incoming", "Tomorrow me hates today me",
-  "WiFi > oxygen", "Episode 1? Rookie numbers",
-  "Netflix & actually chill", "Loading… like my life",
-  "Remote wars = real wars", "Popcorn lung = real",
-  "Couch dent = legacy",
-
-  // Genre-specific
-  "Horror: heart attack free", "Sci-fi: beam me up, couch",
-  "Rom-com: love? Nah, binge", "Drama: tears > tissues",
-  "Action: boom in my room", "Comedy: LOL till I choke",
-  "Thriller: plot twist pants", "Fantasy: dragons > deadlines",
-  "True crime: guilty pleasure", "Anime: subs > dubs fight",
-  "Reality TV: messier than me", "Docu: facts? Mind blown",
-  "Superhero: cape on couch", "Mystery: who done it? Me",
-  "Historical: time travel cheap",
-
-  // Post-binge regrets
-  "What day is it again?", "Eyes: send help pls",
-  "Sunlight? What's that?", "Productive? Never was",
-  "Butt numb, soul empty", "Regret level: max",
-  "Tomorrow me: furious", "Plants dead, me alive?",
-  "Social life? Canceled", "Binge hangover hits",
-  "Mirror: who are you?", "Chores piled like eps",
-  "Wallet: snacks broke me", "Brain rot achieved",
-  "Neck pain = trophy",
-
-  // Tech glitch roasts
-  "Buffering… my life", "Ads: skip my existence",
-  "WiFi ghosted me", "HD? More like huh?",
-  "Autoplay? Evil overlord", "Error 404: fun not found",
-  "Loading… forever alone", "Pixelated dreams",
-  "Remote battery dead", "Stream lag = rage",
-  "Subtitles glitchy mess", "App crash = my mood",
-  "No signal? Apocalypse", "Update now? Hell no",
-  "You're the Debrid Master"
-];
-
-// 14 days or less (warning) — funny/edgy nudge
-const QUOTES_WARN = [
-  "Renew before cliffhanger.", "Cheaper than snacks.",
-  "Tiny fee, huge chill.", "Beat the ‘oops, expired’.",
-  "Your future self says thanks.", "Renew now, binge later.",
-  "Don’t pause the fun.", "Click. Renew. Continue.",
-  "Keep calm, renew on.", "Roll credits on worry.",
-  "Pay up or plot twist: pain", "Binge tax due, peasant",
-  "Wallet lighter, soul fuller", "Renew or face the void",
-  "Card declined? Big sad", "Couch demands tribute",
-  "Subscription > therapy", "Click or cry at 99%",
-  "Renewal = plot armor", "Don’t let the algorithm win",
-  "Cheaper than Starbucks coffee"
-];
-
-// 3 days or less (critical) — urgent but still funny
-const QUOTES_CRIT = [
-  "Boss fight: renewal.", "Renew soon, it's coming!",
-  "Please renew soon...", "Your time is almost up!",
-  "Don't let your ISP catch on", "Two taps, all vibes.",
-  "Renew = peace unlocked.", "Don’t lose the finale.",
-  "Almost out—top up.", "3…2…renew.", "Tiny bill, big joy.",
-  "Grab the lifeline.", "Save the weekend.",
-  "Clock’s loud. Renew.", "Last ep loading… or not",
-  "Buffering fate. Renew.", "Do it or doomscroll life",
-  "Finale blocked. Pay up.", "Renew or rage quit",
-  "Plot armor expiring"
-];
-
-// 0 or less (expired) — roast mode ON
-const QUOTES_EXPIRED = [
-  "Renew ASAP or else...", "Your ISP will be mad!",
-  "Renew now to avoid ISP Warnings", "Renew subscription to continue",
-  "Renew to avoid confrontation", "Renew now to continue",
-  "We're not responsible, renew.", "We pause respectfully.",
-  "Refill the fun meter.", "Next ep awaits payment.",
-  "Fix the sub, then binge.", "Snack break until renew.",
-  "Epic… after renewal.", "Re-subscribe to continue.",
-  "Broke hours activated", "Screen black, dreams too",
-  "Poor and plotless", "Renew or rot in reality",
-  "Buffering… forever", "Cliffhanger hell awaits",
-  "Wallet betrayed you", "Free trial? Cute story",
-  "Back to real life, sucka", "Binge blocked. L bozo",
-  "Paywall won. You lost.", "Subscription graveyard",
-  "Bills > chills > skills", "Restart life.exe failed",
-  "Touch grass (mandatory)", "You had one job: renew"
-];
-
-const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
 
 // Simple in-memory cache
 const cache = new Map();
@@ -427,8 +296,6 @@ async function pPremiumize({ key, useOAuth = false, fetchImpl = fetch }) {
   }
 }
 
-// TorBox — updated to match documented API shape:
-//   { success, error, detail, data: { is_subscribed, premium_expires_at, ... } }
 async function pTorBox({ token, fetchImpl = fetch }) {
   const name = "TorBox";
   if (!token)
@@ -465,7 +332,6 @@ async function pTorBox({ token, fetchImpl = fetch }) {
 
     const j = await res.json();
 
-    // TorBox standard response: { success, data, error, message/detail }
     if (j?.success === false && !j?.data) {
       return {
         name,
@@ -621,16 +487,15 @@ async function pDebridLink({
 // --------------------------- Status Formatting -----------------------------
 function getStatusInfo(days) {
   if (days <= 0)
-    return { emoji: "🔴", label: "Expired", quoteSet: QUOTES_EXPIRED };
+    return { emoji: "🔴", label: "Expired" };
   if (days <= 3)
-    return { emoji: "🟠", label: "Critical", quoteSet: QUOTES_CRIT };
+    return { emoji: "🟠", label: "Critical" };
   if (days <= 14)
-    return { emoji: "🟡", label: "Warning", quoteSet: QUOTES_WARN };
-  return { emoji: "🟢", label: "OK", quoteSet: QUOTES_OK };
+    return { emoji: "🟡", label: "Warning" };
+  return { emoji: "🟢", label: "OK" };
 }
 
-// showQuote is driven by config "show_quotes"
-function formatProviderStatusWithBreaks(r, showQuote = true) {
+function formatProviderStatusWithBreaks(r) {
   const user = r?.username ? `@${String(r.username)}` : "—";
   const days = Number.isFinite(r.daysLeft) && r.daysLeft !== null
     ? r.daysLeft
@@ -644,7 +509,7 @@ function formatProviderStatusWithBreaks(r, showQuote = true) {
     : "N/A";
 
   const numericDays = typeof days === "number" ? days : 9999;
-  const { emoji, label, quoteSet } = getStatusInfo(numericDays);
+  const { emoji, label } = getStatusInfo(numericDays);
 
   const lines = [];
   lines.push(`🤝 Service: ${r.name}`);
@@ -652,9 +517,6 @@ function formatProviderStatusWithBreaks(r, showQuote = true) {
   lines.push(`⭐ Expires: ${dateStr}`);
   lines.push(`⏳️ Days left: ${days}`);
   lines.push(`${emoji} Status: ${label}`);
-  if (showQuote && quoteSet && quoteSet.length) {
-    lines.push(`💬 ${pick(quoteSet)}`);
-  }
   return lines.join("\n");
 }
 
@@ -677,13 +539,6 @@ const manifest = {
       type: "number",
       default: "45",
       title: "Cache Minutes (default 45)",
-    },
-    {
-      key: "show_quotes",
-      type: "select",
-      title: "Would you like to use quotes?",
-      default: "yes",
-      options: ["yes", "no"],
     },
     {
       key: "visibility_mode",
@@ -731,13 +586,10 @@ async function fetchStatusData(cfg) {
     ? Math.max(1, Number(cfg.cache_minutes))
     : 45;
 
-  // Check demo mode first
   const demoRaw = (cfg.demo_mode || "").toString().toLowerCase();
   const demoModeOn = demoRaw === "on" || demoRaw === "true" || demoRaw === "1";
 
   if (demoModeOn) {
-    // Demo providers with fixed days:
-    // 31, 16, 10, 6, 2, -1
     const demoResults = [
       {
         name: "Real-Debrid (demo 31d)",
@@ -797,7 +649,6 @@ async function fetchStatusData(cfg) {
     };
   }
 
-  // Normal live mode
   const tokens = {
     rd: String(cfg.rd_token || process.env.RD_TOKEN || "").trim(),
     ad: String(cfg.ad_key || process.env.AD_KEY || "").trim(),
@@ -863,7 +714,6 @@ async function fetchStatusData(cfg) {
 }
 
 // ---------------------------- Stream Handler (TV) --------------------------
-// ---------------------------- Stream Handler (TV) --------------------------
 builder.defineStreamHandler(async (args) => {
   const reqId = String(args?.id || "");
   if (!reqId || !reqId.startsWith("tt")) return { streams: [] };
@@ -882,7 +732,6 @@ builder.defineStreamHandler(async (args) => {
 
   const statusData = await fetchStatusData(cfg);
 
-  // TVs filter out setup/instructional streams; if no tokens, return empty.
   if (
     !statusData.enabled ||
     !Object.values(statusData.enabled).some((v) => v)
@@ -890,18 +739,6 @@ builder.defineStreamHandler(async (args) => {
     return { streams: [] };
   }
 
-  // Determine whether to show quotes
-  let showQuotes = true;
-  const sqRaw = cfg.show_quotes;
-  if (typeof sqRaw === "boolean") {
-    showQuotes = sqRaw;
-  } else if (typeof sqRaw === "string") {
-    const val = sqRaw.trim().toLowerCase();
-    if (["no", "false", "0", "off"].includes(val)) showQuotes = false;
-    if (["yes", "true", "1", "on"].includes(val)) showQuotes = true;
-  }
-
-  // Determine visibility mode
   const visRaw = (cfg.visibility_mode || "only when close to expiration (≤3 days or less)")
     .toString()
     .toLowerCase();
@@ -916,11 +753,9 @@ builder.defineStreamHandler(async (args) => {
 
       let numericDays = null;
       if (Number.isFinite(r.daysLeft) && r.daysLeft !== null) {
-        // Clamp negatives to 0 so -1, -2, etc. are treated as "Expired"
         numericDays = Math.max(r.daysLeft, 0);
       }
 
-      // If days are unknown, treat as non-urgent and skip
       if (numericDays === null) continue;
 
       const shouldShow =
@@ -930,8 +765,7 @@ builder.defineStreamHandler(async (args) => {
         streams.push({
           name: "🔐 Statusio",
           description: formatProviderStatusWithBreaks(
-            { ...r, daysLeft: numericDays },
-            showQuotes
+            { ...r, daysLeft: numericDays }
           ),
           url: "https://real-debrid.com/",
           externalUrl: "https://real-debrid.com/",
@@ -947,30 +781,6 @@ builder.defineStreamHandler(async (args) => {
   return { streams: finalStreams };
 });
 
-// ------------------------------ Debug: Test Quotes -------------------------
-// STATUSIO_DEBUG=quotes node index.js   -> prints preview of messages
-if (process.env.STATUSIO_DEBUG === "quotes") {
-  const testDays = [17, 12, 6, 2, -1];
-
-  for (const d of testDays) {
-    const r = {
-      name: "Real-Debrid (debug)",
-      username: "DemoUser",
-      daysLeft: d,
-      premium: d > 0,
-      untilISO: null,
-    };
-
-    console.log("========================================");
-    console.log(`Test case: ${d} days left`);
-    console.log("----------------------------------------");
-    console.log(formatProviderStatusWithBreaks(r, true));
-    console.log();
-  }
-
-  process.exit(0);
-}
-
 // ------------------------------ Server -------------------------------------
 const PORT = Number(process.env.PORT || 7042);
 serveHTTP(builder.getInterface(), { port: PORT, hostname: "0.0.0.0" });
@@ -979,5 +789,5 @@ console.log(
   `✅ Statusio v1.1.28 at http://127.0.0.1:${PORT}/manifest.json`
 );
 console.log(
-  `↩️  Description = strict per-field lines; quotes optional; only ≤3 days show; demo mode available.`
+  `↩️  Description = strict per-field lines; only ≤3 days show; demo mode available.`
 );
